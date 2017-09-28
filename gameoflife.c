@@ -5,7 +5,7 @@
 
 unsigned char matrix[ROW][COLUMN];
 FILE* file;
-char fileName[50];
+//char* fileName[];
 
 void openFile()
 {
@@ -15,9 +15,9 @@ void openFile()
 	short bit;
 	unsigned char line[400];
 
-	printf("Enter a file name: ");
-	scanf("%49[^\n]", fileName);
-	file = fopen(fileName, "rb");
+//	printf("Enter a file name: ");
+//	scanf("%49[^\n]", fileName);
+//	file = fopen(fileName, "rb");
 	
 	fread(&line, sizeof(char), 400, file);
 	
@@ -46,7 +46,7 @@ void openFile()
 //This function check the matrix element for 1(alive) and replaces it with "O", otherwise it will be " ".
 char* cellAlive(int y, int x)
 {
-	if(matrix[y][x] != 0)
+	if(matrix[y][x])
 		return "O";
 	else
 		return " ";
@@ -68,7 +68,7 @@ void printGrid()
 }
 
 //This function checks the surrounding cells.
-int cellCheck(int x, int y)
+int cellCheck(int y, int x)
 {
 	int counter = 0;
 	int horizontal;
@@ -107,10 +107,11 @@ int cellCheck(int x, int y)
 		{
 			for(horizontal = 0; horizontal <= 1; horizontal++)
 			{
-				matrix[y + vertical][x + horizontal] ? counter ++ : dump++;
+				if(horizontal || vertical) matrix[y + vertical][x + horizontal] ? counter ++ : dump++;
+				
 			}
 		}
-		return (counter - 1);
+		return counter;
 	}
 	else if(x == COLUMN) //Checks to see if it's the rightmost element.
 	{
@@ -118,10 +119,10 @@ int cellCheck(int x, int y)
 		{
 			for(horizontal = 0; horizontal >= -1; horizontal--)
 			{
-				matrix[y + vertical][x + horizontal] ? counter ++ : dump++;
+				if(horizontal || vertical) matrix[y + vertical][x + horizontal] ? counter ++ : dump++;
 			}
 		}
-		return (counter - 1);
+		return counter;
 	}
 	else if(y == 0) //Checks to see if it's the top element.
 	{
@@ -129,10 +130,10 @@ int cellCheck(int x, int y)
 		{
 			for(horizontal = -1; horizontal <= 1; horizontal++)
 			{
-				matrix[y + vertical][x + horizontal] ? counter ++ : dump++;
+				if(horizontal || vertical) matrix[y + vertical][x + horizontal] ? counter ++ : dump++;
 			}
 		}
-		return (counter - 1);
+		return counter;
 	}
 	else if(y == ROW) //Checks to see if it's the bottom element.
 	{
@@ -140,10 +141,10 @@ int cellCheck(int x, int y)
 		{
 			for(horizontal = -1; horizontal <= 1; horizontal++)
 			{
-				matrix[y + vertical][x + horizontal] ? counter ++ : dump++;
+				if(horizontal || vertical) matrix[y + vertical][x + horizontal] ? counter ++ : dump++;
 			}
 		}
-		return (counter - 1);
+		return counter;
 	}
 	else //Otherwise if the element has 8 sides.
 	{
@@ -151,10 +152,10 @@ int cellCheck(int x, int y)
 		{
 			for(horizontal = -1; horizontal <= 1; horizontal++)
 			{
-				matrix[y + vertical][x + horizontal] ? counter ++ : dump++;
+				if(horizontal || vertical) matrix[y + vertical][x + horizontal] ? counter ++ : dump++;
 			}
 		}
-		return (counter - 1);
+		return counter;
 	}
 }
 
@@ -166,17 +167,17 @@ This function changes the matrix based on the rules established:
 4. Any empty cell with exactly three neighbors becomes live in the next generation.
 5. Any empty cell with a number of neighbors not equal to three remains empty.
 */
-void generation()
+void generation(int turn)
 {
-	int turn;
-	int currentTurn;
+//	int turn;
 	unsigned char tempMatrix[ROW][COLUMN];
+	int currentTurn;
 	int x;
 	int y;
 	int counter;
 	
-	printf("Enter number of generations: ");
-	scanf("%d", &turn);
+//	printf("Enter number of generations: ");
+//	scanf("%d", &turn);
 	
 	for(currentTurn = 0; currentTurn < turn; currentTurn++)
 	{
@@ -184,19 +185,36 @@ void generation()
 		{
 			for(x = 0; x < COLUMN; x++)
 			{
-				counter = cellCheck(x, y);
-				if(counter < 0 || counter == 2)
+				counter = cellCheck(y, x);
+				switch (counter)
+				{
+					case 2:
+						tempMatrix[y][x] = matrix[y][x];
+						break;
+					case 3:
+						if(matrix[y][x]) tempMatrix[y][x] = 1;
+						break;
+					default:
+						tempMatrix[y][x] = 0;
+				}
+				/*
+				if(counter == 2)
 				{
 					tempMatrix[y][x] = matrix[y][x];
 				}
-				else if(counter < 2 || counter > 3)
+				if(counter == 3)
+				{
+					if(matrix[y][x]) tempMatrix[y][x] = 1;
+				}
+				if(counter < 2)
 				{
 					tempMatrix[y][x] = 0;
 				}
-				else
+				if(counter > 3)
 				{
-					tempMatrix[y][x] = 1;
+					tempMatrix[y][x] = 0;
 				}
+				*/
 			}
 		}
 		for(y = 0; y < ROW; y++)
@@ -209,10 +227,11 @@ void generation()
 	}
 }
 
-int main()
+int main(int argc, char* argv[])
 {
+	file = fopen(argv[1], "r");
 	openFile();
-	generation();
+	generation(atoi(argv[2]));
 	printGrid();
 /*	int x, y;
 	for(y = 0; y < ROW; y++)
@@ -233,4 +252,9 @@ and assigns it to the "line" variable, the actual element is never used? I have 
 the memory address of those element and placing it into the matrix. Which would explain why the output of my program varies from each run. Unfortunately, this is the
 only theory as to why my program is not producing the expected output. Please note that i performed the test with 0 generation and therefor should only print the
 contents of the matrix right after it is read and before any actions are performed on it.
+*/
+
+/*
+1. Random bits being turned on and off, most notably bottom left corner of the matrix.
+2. Some bits are not being turned on regardless if it meets the criteria, check turn 1 of blinker (large circle pattern in the 4th quadrant of the matrix).
 */
