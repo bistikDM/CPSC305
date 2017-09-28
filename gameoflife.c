@@ -31,11 +31,13 @@ void openFile()
 			This loop goes through each line element (8bit) and perform bit operation ~> shifts right and & with 128 to isolate each bit.
 			Afterwards, it assigns the value into the matrix.
 			*/
-			for(bit = 0; bit < 8; bit++)
+			matrix[y][x] = (line[z] & (128 >> bit));
+			bit++;
+			if(bit == 8)
 			{
-				matrix[y][x] = (line[z] & (128 >> bit));
+				bit = 0;
+				z++;
 			}
-			z++;
 		}
 	}
 	fclose(file);
