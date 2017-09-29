@@ -5,7 +5,6 @@
 
 unsigned char matrix[ROW][COLUMN];
 FILE* file;
-//char* fileName[];
 
 void openFile()
 {
@@ -14,10 +13,6 @@ void openFile()
 	short z = 0;
 	short bit;
 	unsigned char line[400];
-
-//	printf("Enter a file name: ");
-//	scanf("%49[^\n]", fileName);
-//	file = fopen(fileName, "rb");
 	
 	fread(&line, sizeof(char), 400, file);
 	
@@ -54,7 +49,7 @@ char* cellAlive(int y, int x)
 
 //This function prints the content of the matrix.
 void printGrid()
-{;
+{
 	int x;
 	int y;
 	for(y = 0; y < ROW; y++)
@@ -67,96 +62,24 @@ void printGrid()
 	}
 }
 
-//This function checks the surrounding cells.
+//This function checks the surrounding cells. Counter only increments if it is within the matrix and not the original position.
 int cellCheck(int y, int x)
 {
 	int counter = 0;
-	int horizontal;
-	int vertical;
-	int dump = 0;
-	
-	//Note to self: check if there's an alternate conditional statement that is more efficient than the ternary operator, the else operation is not necessary.
-	if(x == 0 && y == 0) //Checks to see if it's the top left corner.
+	signed int horizontal;
+	signed int vertical;
+
+	for(vertical = -1; vertical <= 1; vertical++)
 	{
-		matrix[y][x + 1] ? counter++ : dump++;
-		matrix[y + 1][x] ? counter++ : dump++;
-		matrix[y + 1][x + 1] ? counter++ : dump++;
-			
-	}
-	else if(x == COLUMN && y == 0) //Checks to see if it's the top right corner.
-	{
-		matrix[y][x - 1] ? counter++ : dump++;
-		matrix[y + 1][x] ? counter++ : dump++;
-		matrix[y + 1][x - 1] ? counter++ : dump++;
-	}
-	else if(x == 0 && y == ROW) //Checks to see if it's the bottom left corner.
-	{
-		matrix[y][x + 1] ? counter++ : dump++;
-		matrix[y - 1][x] ? counter++ : dump++;
-		matrix[y - 1][x + 1] ? counter++ : dump++;
-	}
-	else if(x == COLUMN && y == ROW) //Checks to see if it's the bottom right corner.
-	{
-		matrix[y][x - 1] ? counter++ : dump++;
-		matrix[y - 1][x] ? counter++ : dump++;
-		matrix[y - 1][x - 1] ? counter++ : dump++;
-	}
-	else if(x == 0) //Checks to see if it's the leftmost element.
-	{
-		for(vertical = -1; vertical <= 1; vertical++)
+		for(horizontal = -1; horizontal <= 1; horizontal++)
 		{
-			for(horizontal = 0; horizontal <= 1; horizontal++)
+			if((horizontal || vertical) && (horizontal + x < COLUMN && horizontal + x >= 0) && (vertical + y < ROW && vertical + y >= 0))
 			{
-				if(horizontal || vertical) matrix[y + vertical][x + horizontal] ? counter ++ : dump++;
-				
+					if(matrix[y + vertical][x + horizontal]) counter++;
 			}
 		}
-		return counter;
 	}
-	else if(x == COLUMN) //Checks to see if it's the rightmost element.
-	{
-		for(vertical = -1; vertical <= 1; vertical++)
-		{
-			for(horizontal = 0; horizontal >= -1; horizontal--)
-			{
-				if(horizontal || vertical) matrix[y + vertical][x + horizontal] ? counter ++ : dump++;
-			}
-		}
-		return counter;
-	}
-	else if(y == 0) //Checks to see if it's the top element.
-	{
-		for(vertical = 0; vertical <= 1; vertical++)
-		{
-			for(horizontal = -1; horizontal <= 1; horizontal++)
-			{
-				if(horizontal || vertical) matrix[y + vertical][x + horizontal] ? counter ++ : dump++;
-			}
-		}
-		return counter;
-	}
-	else if(y == ROW) //Checks to see if it's the bottom element.
-	{
-		for(vertical = 0; vertical >= -1; vertical--)
-		{
-			for(horizontal = -1; horizontal <= 1; horizontal++)
-			{
-				if(horizontal || vertical) matrix[y + vertical][x + horizontal] ? counter ++ : dump++;
-			}
-		}
-		return counter;
-	}
-	else //Otherwise if the element has 8 sides.
-	{
-		for(vertical = -1; vertical <= 1; vertical++)
-		{
-			for(horizontal = -1; horizontal <= 1; horizontal++)
-			{
-				if(horizontal || vertical) matrix[y + vertical][x + horizontal] ? counter ++ : dump++;
-			}
-		}
-		return counter;
-	}
+	return counter;
 }
 
 /*
@@ -169,15 +92,11 @@ This function changes the matrix based on the rules established:
 */
 void generation(int turn)
 {
-//	int turn;
 	unsigned char tempMatrix[ROW][COLUMN];
 	int currentTurn;
 	int x;
 	int y;
 	int counter;
-	
-//	printf("Enter number of generations: ");
-//	scanf("%d", &turn);
 	
 	for(currentTurn = 0; currentTurn < turn; currentTurn++)
 	{
@@ -192,29 +111,11 @@ void generation(int turn)
 						tempMatrix[y][x] = matrix[y][x];
 						break;
 					case 3:
-						if(matrix[y][x]) tempMatrix[y][x] = 1;
+						tempMatrix[y][x] = 1;
 						break;
 					default:
 						tempMatrix[y][x] = 0;
 				}
-				/*
-				if(counter == 2)
-				{
-					tempMatrix[y][x] = matrix[y][x];
-				}
-				if(counter == 3)
-				{
-					if(matrix[y][x]) tempMatrix[y][x] = 1;
-				}
-				if(counter < 2)
-				{
-					tempMatrix[y][x] = 0;
-				}
-				if(counter > 3)
-				{
-					tempMatrix[y][x] = 0;
-				}
-				*/
 			}
 		}
 		for(y = 0; y < ROW; y++)
@@ -229,32 +130,17 @@ void generation(int turn)
 
 int main(int argc, char* argv[])
 {
-	file = fopen(argv[1], "r");
-	openFile();
-	generation(atoi(argv[2]));
-	printGrid();
-/*	int x, y;
-	for(y = 0; y < ROW; y++)
+	if(argc != 3)
 	{
-		for(x = 0; x < COLUMN; x++)
-		{
-			printf("%hhu ", matrix[y][x]);
-		}
-		printf("\n\nBREAK\n\n");
+		printf("Please supply file and number of generations in that order.\n");
+		return 1;
 	}
-*/
-	return 0;
+	else
+	{
+		file = fopen(argv[1], "r");
+		openFile();
+		generation(atoi(argv[2]));
+		printGrid();
+		return 0;
+	}
 }
-
-/*
-The output of the the matrix is always different for each run. Could it be that in the openFile() function after line 22 where it reads the content of the file
-and assigns it to the "line" variable, the actual element is never used? I have a feeling that from line 25 to 40 instead of parsing each element, it is working on
-the memory address of those element and placing it into the matrix. Which would explain why the output of my program varies from each run. Unfortunately, this is the
-only theory as to why my program is not producing the expected output. Please note that i performed the test with 0 generation and therefor should only print the
-contents of the matrix right after it is read and before any actions are performed on it.
-*/
-
-/*
-1. Random bits being turned on and off, most notably bottom left corner of the matrix.
-2. Some bits are not being turned on regardless if it meets the criteria, check turn 1 of blinker (large circle pattern in the 4th quadrant of the matrix).
-*/
