@@ -98,13 +98,19 @@ unsigned char add_color(unsigned char r, unsigned char g, unsigned char b) {
 struct paddle {
     unsigned short x, y, length;
     unsigned char color;
-    unsigned short width = 4;
+    unsigned short width;
 };
 
 struct ball
 {
     unsigned short x, y, size;
     unsigned char color;
+};
+
+struct playerScore
+{
+    char player[];
+    unsigned short score;
 };
 
 /* put a pixel on the screen in mode 4 */
@@ -129,9 +135,9 @@ void put_pixel(volatile unsigned short* buffer, int row, int col, unsigned char 
 void draw_paddle(volatile unsigned short* buffer, struct paddle* p) {
     short row, col;
     /* for each row of the paddle */
-    for (row = p->y; row < (p->y + p->width); row++) {
+    for (row = p->y; row < (p->y + p->length); row++) {
         /* loop through each column of the paddle */
-        for (col = p->x; col < (p->x + p->length); col++) {
+        for (col = p->x; col < (p->x + p->width); col++) {
             /* set the screen location to this color */
             put_pixel(buffer, row, col, p->color);
         }
@@ -146,7 +152,7 @@ void draw_ball(volatile unsigned short* buffer, struct ball* b)
     {
         for (col = b -> x; col < (b -> x + b -> size); col++)
         {
-            put_pixel(buffer, row, col, p -> color);
+            put_pixel(buffer, row, col, b -> color);
         }
     }
 }
@@ -205,24 +211,24 @@ void basicAI(struct paddle* p)
     {
         if (p -> y == (HEIGHT - length))
         {
-            p -> y -= 2;
+            p -> y -= 1;
             directionTracker = 0;
         }
         else
         {
-            p -> y += 2;
+            p -> y += 1;
         }
     }
     else
     {
         if (p -> y == 0)
         {
-            p -> y += 2;
+            p -> y += 1;
             directionTracker = 1;
         }
         else
         {
-            p -> y -= 2;
+            p -> y -= 1;
         }
     }
 }
@@ -235,14 +241,117 @@ void ballMove(struct ball* b)
     b -> y += dy;
 }
 
+/* records the score for both the player and computer as well as incrementing score. */
+void scoreKeeper(struct playerScore* p)
+{
+    *p -> score++;
+}
+
+/* check the position of the ball and perform an action based on the condition of the ball. */
+void ballCollision(struct ball* b, struct playerScore* p1, struct playerScore* p2, struct paddle* left, struct paddle* right, volatile unsigned short* buffer, unsigned char color)
+{
+    switch(b -> x)
+    {
+        case WIDTH:
+            scoreKeeper(&p1);
+            //ballSpawn(&b);
+            resetState(&left, &right, &b, buffer, color);
+            break;
+        case 0:
+            scoreKeeper(&p2);
+            //ballSpawn(&b);
+            resetState(&left, &right, &b, buffer, color);
+            break;
+    }
+    
+    switch(b -> y)
+    {
+        case HEIGHT:
+        case 0:
+            dy *= -1;
+            break;
+    }
+    
+    // if the ball is in contact with the paddle, reverse the momentum of the ball in the x-axis.
+    if(((b -> x == (left -> x + left -> width)) && ((b -> y >= left -> y) && (b -> y <= (left -> y + left -> length)))) || 
+    ((b -> x == right -> x) && ((b -> y >= right -> y) && (b -> y <= (right -> y + right -> length))))) dx *= -1;
+}
+
+/* resets the paddle and ball position as well as game speed (implement later) after a score. */
+void resetState(struct paddle* left, struct paddle* right, struct ball* b, volatile unsigned short* buffer, unsigned char color)
+{
+    *left -> x = 35;
+    *left -> y = 75;
+    *right -> x = 205;
+    *right -> y = 75;
+    
+    quadrant = rand() % 4;
+    switch (quadrant)
+    {
+        case 0:
+            dx = -1;
+            dy = 1;
+            break;
+        case 1:
+            dx = 1;
+            dy = 1;
+            break;
+        case 2:
+            dx = -1;
+            dy = -1;
+            break;
+        default:
+            dx = 1;
+            dy = -1;
+    }
+    *b -> x = 119;
+    *b -> y = 79;
+    
+    clear_screen(buffer, color);
+    draw_paddle(buffer, &left);
+    draw_paddle(buffer, &right);
+    draw_ball(buffer, &b);
+}
+
+/* spawns the ball in the center of the screen and randomly select a quadrant to play the ball. */
+/*
+void ballSpawn(struct ball* b)
+{
+    quadrant = rand() % 4;
+    switch (quadrant)
+    {
+        case 0:
+            dx = -1;
+            dy = 1;
+            break;
+        case 1:
+            dx = 1;
+            dy = 1;
+            break;
+        case 2:
+            dx = -1;
+            dy = -1;
+            break;
+        default:
+            dx = 1;
+            dy = -1;
+    }
+    *b -> x = 119;
+    *b -> y = 79;
+}
+*/
+
 /* the main function */
 int main() {
     /* we set the mode to mode 4 with bg2 on */
     *display_control = MODE4 | BG2;
 
     /* make 2 light slate gray paddles */
-    struct paddle player = {35, 75, 15, add_color(119, 136, 153)};
-    struct paddle computer = {205, 75, 15, add_color(119,136,153)};
+    struct paddle player = {35, 75, 15, add_color(119, 136, 153), 4};
+    struct paddle computer = {205, 75, 15, add_color(119,136,153), 4};
+    
+    struct playerScore player1 = {"PLAYER 1", 0};
+    struct playerScore player2 = {"PLAYER 2", 0};
     
     /* make the playing ball for pong */
     struct ball pong = {119, 79, 2, add_color(119, 136, 153)};
@@ -257,31 +366,14 @@ int main() {
     clear_screen(front_buffer, black);
     clear_screen(back_buffer, black);
     
-    quadrant = rand() % 4;
-    switch (quadrant)
-    {
-        case 0:
-            dx = -2;
-            dy = 2;
-            break;
-        case 1:
-            dx = 2;
-            dy = 2;
-            break;
-        case 2:
-            dx = -2;
-            dy = -2;
-            break;
-        default:
-            dx = 2;
-            dy = -2;
-    }
+    ballSpawn();
 
     /* loop forever */
     while (1) {
-        /* clear the screen - only the areas around the paddle! */
+        /* clear the screen - only the areas around the paddle and ball! */
         update_screen(buffer, black, &player);
         update_screen(buffer, black, &computer);
+        // must add my own update screen just for the ball! or alter the current one.
 
         /* draw the paddles and ball */
         draw_paddle(buffer, &player);
@@ -292,6 +384,7 @@ int main() {
         handle_buttons(&player);
         basicAI(&computer);
         ballMove(&pong);
+        ballCollision(&pong, &player1, &player2, &player, &computer, buffer, black);
 
         /* wait for vblank before switching buffers */
         wait_vblank();
@@ -330,11 +423,12 @@ const intrp IntrTable[13] = {
 /*
 1. Implement AI movement. ~done
 2. Implement ball movement. (Randomize a number for x and y direction %4) ~done
-3. Ball collision & direction change.
-4. Boundary line.
+3. Ball collision & direction change. ~done
+4. Boundary line. ~done
 5. Set delay with countdown right after boot.
+6. Reset layout after scoring.
 
 Extras:
 1. Score.
 2. AI ball tracking.
-3. Ball acceleration.
+3. Ball acceleration. (play with the delay loop, this is the for loop that does nothing -> janky wait() used to eat the cycles so that it runs a bit slower)
