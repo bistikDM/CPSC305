@@ -167,6 +167,18 @@ void update_screen(volatile unsigned short* buffer, unsigned short color, struct
     }
 }
 
+void update_ball(volatile unsigned short* buffer, unsigned short color, struct ball* b)
+{
+    short row, col;
+    for (row = b -> y; row < (b -> y + b -> size + 2); row++)
+    {
+        for (col = b -> x; col < (b -> x + b -> size + 2); col++)
+        {
+            put_pixel(buffer, row, col, color);
+        }
+    }
+}
+
 /* this function takes a video buffer and returns to you the other one */
 volatile unsigned short* flip_buffers(volatile unsigned short* buffer) {
     /* if the back buffer is up, return that */
@@ -347,14 +359,15 @@ int main() {
     *display_control = MODE4 | BG2;
 
     /* make 2 light slate gray paddles */
-    struct paddle player = {35, 75, 15, add_color(119, 136, 153), 4};
-    struct paddle computer = {205, 75, 15, add_color(119,136,153), 4};
+    unsigned char slateGray = add_color(119, 136, 153);
+    struct paddle player = {35, 75, 15, slateGray, 4};
+    struct paddle computer = {205, 75, 15, slateGray, 4};
     
     struct playerScore player1 = {"PLAYER 1", 0};
     struct playerScore player2 = {"PLAYER 2", 0};
     
     /* make the playing ball for pong */
-    struct ball pong = {119, 79, 2, add_color(119, 136, 153)};
+    struct ball pong = {119, 79, 2, slateGray};
 
     /* add black to the palette */
     unsigned char black = add_color(0, 0, 0);
@@ -366,14 +379,14 @@ int main() {
     clear_screen(front_buffer, black);
     clear_screen(back_buffer, black);
     
-    ballSpawn();
+    //ballSpawn();
 
     /* loop forever */
     while (1) {
         /* clear the screen - only the areas around the paddle and ball! */
         update_screen(buffer, black, &player);
         update_screen(buffer, black, &computer);
-        // must add my own update screen just for the ball! or alter the current one.
+        update_ball(buffer, black, &pong);
 
         /* draw the paddles and ball */
         draw_paddle(buffer, &player);
@@ -426,7 +439,7 @@ const intrp IntrTable[13] = {
 3. Ball collision & direction change. ~done
 4. Boundary line. ~done
 5. Set delay with countdown right after boot.
-6. Reset layout after scoring.
+6. Reset layout after scoring. ~done
 
 Extras:
 1. Score.
