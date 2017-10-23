@@ -109,8 +109,8 @@ struct ball
 
 struct playerScore
 {
-    char player[];
     unsigned short score;
+    char player[8];
 };
 
 /* put a pixel on the screen in mode 4 */
@@ -160,8 +160,8 @@ void draw_ball(volatile unsigned short* buffer, struct ball* b)
 /* clear the screen right around the paddle */
 void update_screen(volatile unsigned short* buffer, unsigned short color, struct paddle* p) {
     short row, col;
-    for (row = p->y - 2; row < (p->y + p->width + 2); row++) {
-        for (col = p->x - 2; col < (p->x + p->length + 2); col++) {
+    for (row = p->y - 2; row < (p->y + p->length + 2); row++) {
+        for (col = p->x; col < (p->x + p->width); col++) {
             put_pixel(buffer, row, col, color);
         }
     }
@@ -170,9 +170,9 @@ void update_screen(volatile unsigned short* buffer, unsigned short color, struct
 void update_ball(volatile unsigned short* buffer, unsigned short color, struct ball* b)
 {
     short row, col;
-    for (row = b -> y; row < (b -> y + b -> size + 2); row++)
+    for (row = b -> y - 2; row < (b -> y + b -> size + 2); row++)
     {
-        for (col = b -> x; col < (b -> x + b -> size + 2); col++)
+        for (col = b -> x - 2; col < (b -> x + b -> size + 2); col++)
         {
             put_pixel(buffer, row, col, color);
         }
@@ -195,13 +195,13 @@ volatile unsigned short* flip_buffers(volatile unsigned short* buffer) {
 
 /* handle the buttons which are pressed down */
 void handle_buttons(struct paddle* p) {
-    /* move the paddle with the arrow keys */
-    if (button_pressed(BUTTON_DOWN)) {
-        p->y += 2;
-    }
-    if (button_pressed(BUTTON_UP)) {
-        p->y -= 2;
-    }
+    /* move the paddle with the arrow keys */	
+	if (button_pressed(BUTTON_DOWN) && ((p->y + p->length) < HEIGHT)) {
+		p->y++;
+	}
+	if (button_pressed(BUTTON_UP) && (p->y > 0)) {
+		p->y--;
+	}
 }
 
 /* clear the screen to black */
@@ -221,7 +221,7 @@ void basicAI(struct paddle* p)
 {
     if (directionTracker)
     {
-        if (p -> y == (HEIGHT - length))
+        if (p -> y == (HEIGHT - p -> length))
         {
             p -> y -= 1;
             directionTracker = 0;
@@ -256,29 +256,70 @@ void ballMove(struct ball* b)
 /* records the score for both the player and computer as well as incrementing score. */
 void scoreKeeper(struct playerScore* p)
 {
-    *p -> score++;
+    p -> score++;
+}
+
+/* resets the paddle and ball position as well as game speed (implement later) after a score. */
+void resetState(struct paddle* left, struct paddle* right, struct ball* b, unsigned char color)
+{
+    left -> x = 35;
+    left -> y = 75;
+    right -> x = 205;
+    right -> y = 75;
+    
+    quadrant = rand() % 4;
+    switch (quadrant)
+    {
+        case 0:
+            dx = -1;
+            dy = 1;
+            break;
+        case 1:
+            dx = 1;
+            dy = 1;
+            break;
+        case 2:
+            dx = -1;
+            dy = -1;
+            break;
+        default:
+            dx = 1;
+            dy = -1;
+    }
+    b -> x = 119;
+    b -> y = 79;
+    
+    clear_screen(front_buffer, color);
+    clear_screen(back_buffer, color);
 }
 
 /* check the position of the ball and perform an action based on the condition of the ball. */
-void ballCollision(struct ball* b, struct playerScore* p1, struct playerScore* p2, struct paddle* left, struct paddle* right, volatile unsigned short* buffer, unsigned char color)
+void ballCollision(struct ball* b, struct playerScore* p1, struct playerScore* p2, struct paddle* left, struct paddle* right, unsigned char color)
 {
+	int x;
     switch(b -> x)
     {
         case WIDTH:
-            scoreKeeper(&p1);
-            //ballSpawn(&b);
-            resetState(&left, &right, &b, buffer, color);
+            scoreKeeper(p1);
+            resetState(left, right, b, color);
+			for(x = 0; x < 65535; x++)
+			{
+				//Do nothing.
+			}	
             break;
         case 0:
-            scoreKeeper(&p2);
-            //ballSpawn(&b);
-            resetState(&left, &right, &b, buffer, color);
+            scoreKeeper(p2);
+            resetState(left, right, b, color);
+			for(x = 0; x < 65535; x++)
+			{
+				//Do nothing.
+			}	
             break;
     }
     
     switch(b -> y)
     {
-        case HEIGHT:
+        case (HEIGHT - 2):
         case 0:
             dy *= -1;
             break;
@@ -289,45 +330,8 @@ void ballCollision(struct ball* b, struct playerScore* p1, struct playerScore* p
     ((b -> x == right -> x) && ((b -> y >= right -> y) && (b -> y <= (right -> y + right -> length))))) dx *= -1;
 }
 
-/* resets the paddle and ball position as well as game speed (implement later) after a score. */
-void resetState(struct paddle* left, struct paddle* right, struct ball* b, volatile unsigned short* buffer, unsigned char color)
-{
-    *left -> x = 35;
-    *left -> y = 75;
-    *right -> x = 205;
-    *right -> y = 75;
-    
-    quadrant = rand() % 4;
-    switch (quadrant)
-    {
-        case 0:
-            dx = -1;
-            dy = 1;
-            break;
-        case 1:
-            dx = 1;
-            dy = 1;
-            break;
-        case 2:
-            dx = -1;
-            dy = -1;
-            break;
-        default:
-            dx = 1;
-            dy = -1;
-    }
-    *b -> x = 119;
-    *b -> y = 79;
-    
-    clear_screen(buffer, color);
-    draw_paddle(buffer, &left);
-    draw_paddle(buffer, &right);
-    draw_ball(buffer, &b);
-}
-
 /* spawns the ball in the center of the screen and randomly select a quadrant to play the ball. */
-/*
-void ballSpawn(struct ball* b)
+void startBall()
 {
     quadrant = rand() % 4;
     switch (quadrant)
@@ -348,10 +352,7 @@ void ballSpawn(struct ball* b)
             dx = 1;
             dy = -1;
     }
-    *b -> x = 119;
-    *b -> y = 79;
 }
-*/
 
 /* the main function */
 int main() {
@@ -363,8 +364,8 @@ int main() {
     struct paddle player = {35, 75, 15, slateGray, 4};
     struct paddle computer = {205, 75, 15, slateGray, 4};
     
-    struct playerScore player1 = {"PLAYER 1", 0};
-    struct playerScore player2 = {"PLAYER 2", 0};
+    struct playerScore player1 = {0, "PLAYER 1"};
+    struct playerScore player2 = {0, "PLAYER 2"};
     
     /* make the playing ball for pong */
     struct ball pong = {119, 79, 2, slateGray};
@@ -374,12 +375,15 @@ int main() {
 
     /* the buffer we start with */
     volatile unsigned short* buffer = front_buffer;
-
+	
+	/* game delay */
+	char ballDelay = 0;
+	
     /* clear whole screen first */
     clear_screen(front_buffer, black);
     clear_screen(back_buffer, black);
     
-    //ballSpawn();
+    startBall();
 
     /* loop forever */
     while (1) {
@@ -394,10 +398,15 @@ int main() {
         draw_ball(buffer, &pong);
 
         /* handle button input */
-        handle_buttons(&player);
-        basicAI(&computer);
-        ballMove(&pong);
-        ballCollision(&pong, &player1, &player2, &player, &computer, buffer, black);
+		handle_buttons(&player);
+		basicAI(&computer);
+		if(ballDelay == 5)
+        {	
+			ballMove(&pong);
+			ballDelay = 0;
+		}
+		ballDelay++;
+        ballCollision(&pong, &player1, &player2, &player, &computer, black);
 
         /* wait for vblank before switching buffers */
         wait_vblank();
@@ -445,3 +454,4 @@ Extras:
 1. Score.
 2. AI ball tracking.
 3. Ball acceleration. (play with the delay loop, this is the for loop that does nothing -> janky wait() used to eat the cycles so that it runs a bit slower)
+*/
