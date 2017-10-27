@@ -215,6 +215,27 @@ void clear_screen(volatile unsigned short* buffer, unsigned short color) {
     }
 }
 
+/* tracking AI - not finished*/
+void trackAI(struct paddle* p, struct ball* b)
+{
+	if (((p->y + 6) > b->y) && ((p->y + p->length) < HEIGHT))
+	{
+		p->y += 1;
+	}
+	else if ((p->y + p->length) == HEIGHT)
+	{
+		//Do nothing.
+	}
+	else if (((p->y + 6) < b->y) && (p->y > 0))
+	{
+		p->y -= 1;
+	}
+	else if (p->y == 0)
+	{
+		//Do nothing.
+	}
+}
+
 short directionTracker = 1;
 /* basic AI movement of up and down */
 void basicAI(struct paddle* p)
@@ -299,7 +320,7 @@ void ballCollision(struct ball* b, struct playerScore* p1, struct playerScore* p
 	int x;
     switch(b -> x)
     {
-        case WIDTH:
+        case (WIDTH - 1):
             scoreKeeper(p1);
             resetState(left, right, b, color);
 			for(x = 0; x < 65535; x++)
@@ -319,7 +340,7 @@ void ballCollision(struct ball* b, struct playerScore* p1, struct playerScore* p
     
     switch(b -> y)
     {
-        case (HEIGHT - 2):
+        case (HEIGHT - 1):
         case 0:
             dy *= -1;
             break;
@@ -377,7 +398,7 @@ int main() {
     volatile unsigned short* buffer = front_buffer;
 	
 	/* game delay */
-	char ballDelay = 0;
+	char gameDelay = 0;
 	
     /* clear whole screen first */
     clear_screen(front_buffer, black);
@@ -397,19 +418,22 @@ int main() {
         draw_paddle(buffer, &computer);
         draw_ball(buffer, &pong);
 
-        /* handle button input */
-		handle_buttons(&player);
-		basicAI(&computer);
-		if(ballDelay == 5)
-        {	
-			ballMove(&pong);
-			ballDelay = 0;
-		}
-		ballDelay++;
         ballCollision(&pong, &player1, &player2, &player, &computer, black);
 
         /* wait for vblank before switching buffers */
         wait_vblank();
+
+		handle_buttons(&player);
+		basicAI(&computer);
+		//trackAI(&computer, &pong);
+
+        /* handle button input */
+		if(gameDelay == 5)
+        {	
+			ballMove(&pong);
+			gameDelay = 0;
+		}
+		gameDelay++;
 
         /* swap the buffers */
         buffer = flip_buffers(buffer);
