@@ -6,12 +6,10 @@ uppercase:
     @ TODO - write this function
 	@ r4 is the counter
 	@ r5 temp space of r0
-	@ r6 uppercased
-	sub sp, sp, #16
+	sub sp, sp, #12
 	str lr, [sp]
 	str r4, [sp, #4]
 	str r5, [sp, #8]
-	str r6, [sp, #12]
 	mov r4, #0
 	mov r5, r0
 .top:
@@ -19,16 +17,15 @@ uppercase:
 	cmp r0, #0
 	beq .end
 	bl toupper
-	strb r0, [r6, r4]
+	strb r0, [r5, r4]
 	add r4, r4, #1
 	b .top
 .end:
-	strb r0, [r6, r4]
-	mov r0, r6
+	strb r0, [r5, r4]
+	mov r0, r5
 	ldr lr, [sp]
 	ldr r4, [sp, #4]
 	ldr r5, [sp, #8]
-	ldr r6, [sp, #12]
-	add sp, sp, #16
+	add sp, sp, #12
     mov pc, lr 
 

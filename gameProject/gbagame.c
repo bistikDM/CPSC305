@@ -3,10 +3,10 @@ GBA game that mimics old JRPG, based off of Final Fantasy series.
 */
 
 /* First map and tile of the game. */
-#include first.h
-#include firstTile.h
+#include "first.h"
+#include "firstTile.h"
 /* Second map and tile of the game. */
-#include second.h
+#include "second.h"
 
 /* The size of the GBA screen. */
 #define WIDTH 240
@@ -76,10 +76,10 @@ void wait_vblank()
 }
 
 /* This checks if a button has been pressed and return a true(1) or false(0). */
-unsigned char* button_pressed(unsigned short button)
+unsigned char button_pressed(unsigned short button)
 {
 	unsigned short pressed = *buttons & button;
-	(pressed === 0) ? return 1 : return 0;
+	return (pressed == 0) ? 1 : 0;
 }
 
 /* This returns a pointer to one of the 4 character blocks (0-3). */
@@ -95,7 +95,7 @@ volatile unsigned short* screen_block(unsigned long block)
 }
 
 /* MODULARIZE setup_background() SO IT CAN BE USED FOR MULTIPLE MAPS. (not finished) */
-void setup_background(unsigned char* map_data, unsigned short map_palette, unsigned short map_width, unsigned short map_height, unsigned short tile, unsigned short tile_width, unsigned short tile_height)
+void setup_background(const unsigned char* map_data, const unsigned short* map_palette, unsigned short map_width, unsigned short map_height, const unsigned short* tile, unsigned short tile_width, unsigned short tile_height)
 {
 	int i;
 	for (i = 0; i < PALETTE_SIZE; i++)
@@ -126,7 +126,7 @@ void delay(unsigned int amount)
 int main()
 {
 	*display_control = MODE0 | BG0_ENABLE;
-	setup_background(&first_data, first_palette, first_width, first_height, firstTile, firstTile_width, firstTile_height);
+	setup_background(first_data, first_palette, first_width, first_height, firstTile, firstTile_width, firstTile_height);
 	
 	int xscroll = 0;
 	int yscroll = 0;
