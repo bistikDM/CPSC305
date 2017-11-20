@@ -2,9 +2,10 @@
 GBA game that mimics old JRPG, based off of Final Fantasy series.
 */
 
-/* First map of the game. */
+/* First map and tile of the game. */
 #include first.h
-/* Second map of the game. */
+#include firstTile.h
+/* Second map and tile of the game. */
 #include second.h
 
 /* The size of the GBA screen. */
@@ -94,7 +95,7 @@ volatile unsigned short* screen_block(unsigned long block)
 }
 
 /* MODULARIZE setup_background() SO IT CAN BE USED FOR MULTIPLE MAPS. (not finished) */
-void setup_background(unsigned short* map_data, unsigned short map_palette, unsigned short map_width, unsigned short map_height)
+void setup_background(unsigned char* map_data, unsigned short map_palette, unsigned short map_width, unsigned short map_height, unsigned short tile, unsigned short tile_width, unsigned short tile_height)
 {
 	int i;
 	for (i = 0; i < PALETTE_SIZE; i++)
@@ -102,10 +103,81 @@ void setup_background(unsigned short* map_data, unsigned short map_palette, unsi
 		bg_palette[i] = map_palette[i];
 	}
 	volatile unsigned short* dest = char_block(0);
-	unsigned short* image = *map_data;
+	unsigned short* image = (unsigned short*) map_data;
 	for (i = 0; i < ((map_width * map_height) / 2); i++)
 	{
 		dest[i] = image[i];
 	}
 	*bg0_control = 0 | (0 << 2) | (0 << 6) | (1 << 7) | (16 << 8) | (1 << 13) | (0 << 14);
-	dest =
+	dest = screen_block(16);
+	for (i = 0; i < (tile_width * tile_height); i++)
+	{
+		dest[i] = tile[i];
+	}
+}
+
+/* Wait function. */
+void delay(unsigned int amount)
+{
+	for (int i = 0; i < amount * 10; i++);
+}
+
+/* Main function. */
+int main()
+{
+	*display_control = MODE0 | BG0_ENABLE;
+	setup_background(&first_data, first_palette, first_width, first_height, firstTile, firstTile_width, firstTile_height);
+	
+	int xscroll = 0;
+	int yscroll = 0;
+	
+	while (1)
+	{
+		if (button_pressed(BUTTON_DOWN))
+		{
+			yscroll++;
+		}
+		else if (button_pressed(BUTTON_UP))
+		{
+			yscroll--;
+		}
+		else if (button_pressed(BUTTON_RIGHT))
+		{
+			xscroll++;
+		}
+		else if (button_pressed(BUTTON_LEFT))
+		{
+			xscroll--;
+		}
+		
+		wait_vblank();
+		*bg0_x_scroll = xscroll;
+		*bg0_y_scroll = yscroll;
+		delay(50);
+	}
+}
+
+void interrupt_ignore() 
+{
+    /* do nothing */
+}
+
+
+/* this table specifies which interrupts we handle which way
+ * for now, we ignore all of them */
+typedef void (*intrp)();
+const intrp IntrTable[13] = {
+    interrupt_ignore,   /* V Blank interrupt */
+    interrupt_ignore,   /* H Blank interrupt */
+    interrupt_ignore,   /* V Counter interrupt */
+    interrupt_ignore,   /* Timer 0 interrupt */
+    interrupt_ignore,   /* Timer 1 interrupt */
+    interrupt_ignore,   /* Timer 2 interrupt */
+    interrupt_ignore,   /* Timer 3 interrupt */
+    interrupt_ignore,   /* Serial communication interrupt */
+    interrupt_ignore,   /* DMA 0 interrupt */
+    interrupt_ignore,   /* DMA 1 interrupt */
+    interrupt_ignore,   /* DMA 2 interrupt */
+    interrupt_ignore,   /* DMA 3 interrupt */
+    interrupt_ignore,   /* Key interrupt */
+};
