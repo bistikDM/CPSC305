@@ -3,8 +3,8 @@ GBA game that mimics old JRPG, based off of Final Fantasy series.
 */
 
 /* First map and tile of the game. */
-#include "first.h"
-#include "firstTile.h"
+#include "map1.h"
+#include "map1tile.h"
 /* Second map and tile of the game. */
 #include "second.h"
 
@@ -126,7 +126,7 @@ void delay(unsigned int amount)
 int main()
 {
 	*display_control = MODE0 | BG0_ENABLE;
-	setup_background(first_data, first_palette, first_width, first_height, firstTile, firstTile_width, firstTile_height);
+	setup_background(map1_data, map1_palette, map1_width, map1_height, map1tile, map1tile_width, map1tile_height);
 	
 	int xscroll = 0;
 	int yscroll = 0;
