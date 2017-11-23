@@ -5,6 +5,7 @@ GBA game that mimics old JRPG, based off of Final Fantasy series.
 /* First map and tile of the game. */
 #include "map1.h"
 #include "map1tile.h"
+#include "map1boundary.h"
 /* Second map and tile of the game. */
 //#include "second.h"
 
@@ -144,19 +145,23 @@ void setup_background(const unsigned char* map_data, const unsigned short* map_p
 	memcpy16((unsigned short*) dest, (const unsigned short*) map_data, (map_width * map_height) / 2);
 	dest = screen_block(16);
 	memcpy16((unsigned short*) dest, (const unsigned short*) tile, (tile_width * tile_height));
-	*bg0_control = 0 | (0 << 2) | (0 << 6) | (1 << 7) | (16 << 8) | (1 << 13) | (0 << 14);
+	*bg1_control = 1 | (0 << 2) | (0 << 6) | (1 << 7) | (17 << 8) | (1 << 13) | (0 << 14);
 }
 
 /* This map is drawn on bg1 for playable boundaries. */
 void setup_boundary(const unsigned short* tile, unsigned short tile_width, unsigned short tile_height)
 {
+	/*
 	int i;
-	unsigned short* dest = screen_block(17);
+	volatile unsigned short* dest = screen_block(17);
 	for (i = 0; i < (tile_width * tile_height); i++)
 	{
 		dest[i] = tile[i];
 	}
-	*bg1_control = 1 | (0 << 2) | (0 << 6) | (1 << 7) | (17 << 8) | (1 << 13) | (0 << 14);
+	*/
+	volatile unsigned short* dest = screen_block(17);
+	memcpy16((unsigned short*) dest, (const unsigned short*) tile, (tile_width * tile_height));
+	*bg0_control = 0 | (0 << 2) | (0 << 6) | (1 << 7) | (16 << 8) | (1 << 13) | (0 << 14);
 }
 
 /* Wait function. */
