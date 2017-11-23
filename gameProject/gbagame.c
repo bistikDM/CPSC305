@@ -6,7 +6,7 @@ GBA game that mimics old JRPG, based off of Final Fantasy series.
 #include "map1.h"
 #include "map1tile.h"
 /* Second map and tile of the game. */
-#include "second.h"
+//#include "second.h"
 
 /* The size of the GBA screen. */
 #define WIDTH 240
