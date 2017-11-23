@@ -12,6 +12,17 @@ GBA game that mimics old JRPG, based off of Final Fantasy series.
 #define WIDTH 240
 #define HEIGHT 160
 
+/* DMA flags. */
+#define DMA_ENABLE 0x80000000
+#define DMA_16 0x00000000
+#define DMA_32 0x04000000
+
+/* DMA registers. */
+volatile unsigned int* dma_source = (volatile unsigned int*) 0x40000D4;
+volatile unsigned int* dma_destination = (volatile unsigned int*) 0x40000D8;
+volatile unsigned int* dma_count = (volatile unsigned int*) 0x40000DC;
+
+
 /* The three tile modes. */
 #define MODE0 0x00
 #define MODE1 0x01
@@ -37,6 +48,10 @@ volatile unsigned long* display_control = (volatile unsigned long*) 0x4000000;
 
 /* Address of the color palette. */
 volatile unsigned short* bg_palette = (volatile unsigned short*) 0x5000000;
+volatile unsigned short* sprite_palette = (volatile unsigned short*) 0x5000200;
+
+/* Address of the sprite image data. */
+volatile unsigned short* sprite_image_memory = (volatile unsigned short*) 0x6010000;
 
 /* Button register. */
 volatile unsigned short* buttons = (volatile unsigned short*) 0x04000130;
@@ -94,9 +109,18 @@ volatile unsigned short* screen_block(unsigned long block)
 	return (volatile unsigned short*) (0x6000000 + (block * 0x800));
 }
 
+/* DMA copy. */
+void memcpy16(unsigned short* dest, const unsigned short* source, int amount)
+{
+	*dma_source = (unsigned int) source;
+	*dma_destination = (unsigned int) dest;
+	*dma_count = amount | DMA_16 |DMA_ENABLE;
+}
+
 /* MODULARIZE setup_background() SO IT CAN BE USED FOR MULTIPLE MAPS. (not finished) */
 void setup_background(const unsigned char* map_data, const unsigned short* map_palette, unsigned short map_width, unsigned short map_height, const unsigned short* tile, unsigned short tile_width, unsigned short tile_height)
 {
+	/*
 	int i;
 	for (i = 0; i < PALETTE_SIZE; i++)
 	{
@@ -114,6 +138,25 @@ void setup_background(const unsigned char* map_data, const unsigned short* map_p
 	{
 		dest[i] = tile[i];
 	}
+	*/
+	memcpy16((unsigned short*) bg_palette, (unsigned short*) map_palette, PALETTE_SIZE);
+	volatile unsigned short* dest = char_block(0);
+	memcpy16((unsigned short*) dest, (const unsigned short*) map_data, (map_width * map_height) / 2);
+	dest = screen_block(16);
+	memcpy16((unsigned short*) dest, (const unsigned short*) tile, (tile_width * tile_height));
+	*bg0_control = 0 | (0 << 2) | (0 << 6) | (1 << 7) | (16 << 8) | (1 << 13) | (0 << 14);
+}
+
+/* This map is drawn on bg1 for playable boundaries. */
+void setup_boundary(const unsigned short* tile, unsigned short tile_width, unsigned short tile_height)
+{
+	int i;
+	unsigned short* dest = screen_block(17);
+	for (i = 0; i < (tile_width * tile_height); i++)
+	{
+		dest[i] = tile[i];
+	}
+	*bg1_control = 1 | (0 << 2) | (0 << 6) | (1 << 7) | (17 << 8) | (1 << 13) | (0 << 14);
 }
 
 /* Wait function. */
@@ -125,8 +168,9 @@ void delay(unsigned int amount)
 /* Main function. */
 int main()
 {
-	*display_control = MODE0 | BG0_ENABLE;
+	*display_control = MODE0 | BG0_ENABLE | BG1_ENABLE;
 	setup_background(map1_data, map1_palette, map1_width, map1_height, map1tile, map1tile_width, map1tile_height);
+	setup_boundary(map1boundary, map1boundary_width, map1boundary_height);
 	
 	int xscroll = 0;
 	int yscroll = 0;
