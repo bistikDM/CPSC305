@@ -9,6 +9,9 @@ GBA game that mimics old JRPG, based off of Final Fantasy series.
 /* Second map and tile of the game. */
 //#include "second.h"
 
+/* Sprites for the game. */
+#include "sprites.h"
+
 /* The size of the GBA screen. */
 #define WIDTH 240
 #define HEIGHT 160
@@ -44,6 +47,30 @@ volatile unsigned short* bg3_control = (volatile unsigned short*) 0x400000e;
 /* Pallete size. */
 #define PALETTE_SIZE 256
 
+/* Sprite size. */
+#define NUM_SPRITES 128
+
+/* A sprite struct containing attributes needed to draw the sprite on screen. */
+struct Sprite
+{
+	unsigned short attribute0;
+	unsigned short attribute1;
+	unsigned short attribute2;
+	unsigned short attribute3;
+};
+
+/* An enum type containing the different sizes of sprites for the game. */
+enum SpriteSize
+{
+	16by16;
+	16by32;
+	64by64;
+};
+
+/* An array of all sprites to be used for the game. */
+struct Sprite sprites[NUM_SPRITES];
+int next_sprite_index = 0;
+
 /* Display control pointer points to the GBA graphics register. */
 volatile unsigned long* display_control = (volatile unsigned long*) 0x4000000;
 
@@ -53,6 +80,9 @@ volatile unsigned short* sprite_palette = (volatile unsigned short*) 0x5000200;
 
 /* Address of the sprite image data. */
 volatile unsigned short* sprite_image_memory = (volatile unsigned short*) 0x6010000;
+
+/* Address of the sprite attributes. */
+volatile unsigned short* sprite_attribute_memory = (volatile unsigned short*) 0x7000000;
 
 /* Button register. */
 volatile unsigned short* buttons = (volatile unsigned short*) 0x04000130;
@@ -118,7 +148,7 @@ void memcpy16(unsigned short* dest, const unsigned short* source, int amount)
 	*dma_count = amount | DMA_16 |DMA_ENABLE;
 }
 
-/* MODULARIZE setup_background() SO IT CAN BE USED FOR MULTIPLE MAPS. (not finished) */
+/* This map is drawn on bg1 for visible game map. */
 void setup_background(const unsigned char* map_data, const unsigned short* map_palette, unsigned short map_width, unsigned short map_height, const unsigned short* tile, unsigned short tile_width, unsigned short tile_height)
 {
 	/*
@@ -148,7 +178,7 @@ void setup_background(const unsigned char* map_data, const unsigned short* map_p
 	*bg1_control = 1 | (0 << 2) | (0 << 6) | (1 << 7) | (17 << 8) | (1 << 13) | (0 << 14);
 }
 
-/* This map is drawn on bg1 for playable boundaries. */
+/* This map is drawn on bg0 for playable boundaries. */
 void setup_boundary(const unsigned short* tile, unsigned short tile_width, unsigned short tile_height)
 {
 	/*
@@ -162,6 +192,82 @@ void setup_boundary(const unsigned short* tile, unsigned short tile_width, unsig
 	volatile unsigned short* dest = screen_block(17);
 	memcpy16((unsigned short*) dest, (const unsigned short*) tile, (tile_width * tile_height));
 	*bg0_control = 0 | (0 << 2) | (0 << 6) | (1 << 7) | (16 << 8) | (1 << 13) | (0 << 14);
+}
+
+/* Setup the sprite image and palette. */
+void setup_sprite_image()
+{
+	memcpy16((unsigned short*) sprite_palette, (unsigned short*) sprites_palette, PALETTE_SIZE);
+	memcpy16((unsigned short*) sprite_image_memory, (unsigned short*) sprites_data, (sprites_width * sprites_height) / 2);
+}
+
+/* Initialize a sprite with necessary properties and return a pointer. */
+struct Sprite* sprite_init(int x_coord, int y_coord, enum SpriteSize size, int tile_index, int priority)
+{
+	int index = next_sprite_index++;
+	int size, shape;
+	switch (size)
+	{
+		case 16by16:
+			size = 1;
+			shape = 0;
+			break;
+		case 16by32:
+			size = 2;
+			shape = 2;
+			break;
+		case 64by64:
+			size = 3;
+			shape = 0;
+			break;
+	}
+	sprites[index].attribute0 = y_coord | (0 << 8) | (0 << 10) | (0 << 12) | (1 << 13) | (shape << 14);
+	sprites[index].attribute1 = x_coord | (0 << 9) | (0 << 12) | (0 << 13) | (size << 14);
+	sprites[index].attribute2 = tile_index | (priority << 10) | (0 << 12);
+	return &sprites[index];
+}
+
+/* Set a sprite's position. */
+void sprite_position(struct Sprite* sprite, int x_coord, int y_coord)
+{
+	sprite->attribute0 &= 0xff00;
+	sprite->attribute0 |= (y_coord & 0xff);
+	sprite->attribute1 &= 0xfe00;
+	sprite->attribute1 |= (x & 0x1ff);
+}
+
+/* Moves a sprite in a direction. */
+void sprite_move(struct Sprite* sprite, int dx, int dy)
+{
+	int y = sprite->attribute0 & 0xff;
+	int x = sprite->attribute1 & 0x1ff;
+	sprite_position(sprite, x + dx, y + dy)
+}
+
+/* This updates all of the sprites on the screen. */
+void sprite_update_all()
+{
+	memcpy16((unsigned short*) sprite_attribute_memory, (unsigned short*) sprites, NUM_SPRITES * 4);
+}
+
+/* A struct for each character's logic and behavior. */
+struct Character
+{
+	struct Sprite* sprite;
+	int x, y, frame, animation_delay, counter, move, border;
+};
+
+/* Initializes a character. */
+void character_init(Struct Character* character, int x_coord, int y_coord, enum SpriteSize size)
+{
+	character->x = x_coord;
+	character->y = y_coord;
+	character->border = 40;
+	character->frame = 0;
+	character->move = 0;
+	character->counter = 0;
+	character->animation_delay = 6;
+	character->sprite = sprite_init(x_coord, y_coord, size, 0, 0);
 }
 
 /* Wait function. */
@@ -230,3 +336,14 @@ const intrp IntrTable[13] = {
     interrupt_ignore,   /* DMA 3 interrupt */
     interrupt_ignore,   /* Key interrupt */
 };
+
+/*
+TO DO:
+~ Put all .h into structs so it can be passed as as an argument into functions to make things simpler.
+~ Work on map2 zone.
+~ Work on sprites.
+~ Sprite collision.
+~ Battle map.
+~ Fight menu.
+~ Sprite movement.
+*/
