@@ -26,6 +26,10 @@ volatile unsigned int* dma_source = (volatile unsigned int*) 0x40000D4;
 volatile unsigned int* dma_destination = (volatile unsigned int*) 0x40000D8;
 volatile unsigned int* dma_count = (volatile unsigned int*) 0x40000DC;
 
+/* Flags for sprite handling in display control register. */
+#define SPRITE_MAP_2D 0x0
+#define SPRITE_MAP_1D 0x40
+#define SPRITE_ENABLE 0x1000
 
 /* The three tile modes. */
 #define MODE0 0x00
@@ -62,9 +66,9 @@ struct Sprite
 /* An enum type containing the different sizes of sprites for the game. */
 enum SpriteSize
 {
-	16by16;
-	16by32;
-	64by64;
+	SIZE_16_16,
+	SIZE_16_32,
+	SIZE_64_64,
 };
 
 /* An array of all sprites to be used for the game. */
@@ -202,21 +206,21 @@ void setup_sprite_image()
 }
 
 /* Initialize a sprite with necessary properties and return a pointer. */
-struct Sprite* sprite_init(int x_coord, int y_coord, enum SpriteSize size, int tile_index, int priority)
+struct Sprite* sprite_init(int x_coord, int y_coord, enum SpriteSize dimension, int tile_index, int priority)
 {
 	int index = next_sprite_index++;
 	int size, shape;
-	switch (size)
+	switch (dimension)
 	{
-		case 16by16:
+		case SIZE_16_16:
 			size = 1;
 			shape = 0;
 			break;
-		case 16by32:
+		case SIZE_16_32:
 			size = 2;
 			shape = 2;
 			break;
-		case 64by64:
+		case SIZE_64_64:
 			size = 3;
 			shape = 0;
 			break;
@@ -233,7 +237,7 @@ void sprite_position(struct Sprite* sprite, int x_coord, int y_coord)
 	sprite->attribute0 &= 0xff00;
 	sprite->attribute0 |= (y_coord & 0xff);
 	sprite->attribute1 &= 0xfe00;
-	sprite->attribute1 |= (x & 0x1ff);
+	sprite->attribute1 |= (x_coord & 0x1ff);
 }
 
 /* Moves a sprite in a direction. */
@@ -241,7 +245,14 @@ void sprite_move(struct Sprite* sprite, int dx, int dy)
 {
 	int y = sprite->attribute0 & 0xff;
 	int x = sprite->attribute1 & 0x1ff;
-	sprite_position(sprite, x + dx, y + dy)
+	sprite_position(sprite, x + dx, y + dy);
+}
+
+/* Changes the tile offset of a sprite. */
+void sprite_set_offset(struct Sprite* sprite, int offset)
+{
+	sprite->attribute2 &= 0xfc00;
+	sprite->attribute2 |= (offset & 0x03ff);
 }
 
 /* This updates all of the sprites on the screen. */
@@ -258,7 +269,7 @@ struct Character
 };
 
 /* Initializes a character. */
-void character_init(Struct Character* character, int x_coord, int y_coord, enum SpriteSize size)
+void character_init(struct Character* character, int x_coord, int y_coord, enum SpriteSize size)
 {
 	character->x = x_coord;
 	character->y = y_coord;
@@ -270,6 +281,105 @@ void character_init(Struct Character* character, int x_coord, int y_coord, enum 
 	character->sprite = sprite_init(x_coord, y_coord, size, 0, 0);
 }
 
+/* Moves the character left and if at the border limit, move map instead. */
+int character_left(struct Character* character)
+{
+	character->move = 1;
+	if (character->x < character->border)
+	{
+		return 1;
+	}
+	else
+	{
+		character->x--;
+		return 0;
+	}
+}
+
+/* Moves the character right and if at the border limit, move map instead. */
+int character_right(struct Character* character)
+{
+	character->move = 1;
+	if (character->x > (WIDTH - character->border))
+	{
+		return 1;
+	}
+	else
+	{
+		character->x++;
+		return 0;
+	}
+}
+
+/* Moves the character up and if at the border limit, move map instead. */
+int character_up(struct Character* character)
+{
+	character->move = 1;
+	if (character->y < character->border)
+	{
+		return 1;
+	}
+	else
+	{
+		character->y--;
+		return 0;
+	}
+}
+
+/* Moves the character down and if a t the border limit, move map instead. */
+int character_down(struct Character* character)
+{
+	character->move = 1;
+	if (character->y > (HEIGHT - character->border))
+	{
+		return 1;
+	}
+	else
+	{
+		character->y++;
+		return 0;
+	}
+}
+
+/* If no input detected, stops character sprite animation, and reset frame back to 0. */
+void character_stop(struct Character* character)
+{
+	character->move = 0;
+	character->frame = 0;
+	sprite_set_offset(character->sprite, character->frame);
+}
+
+/* Updates the character sprite. */
+void character_update(struct Character* character)
+{
+	if (character->move)
+	{
+		character->counter++;
+		if (character->counter >= character->animation_delay)
+		{
+			character->frame += 16;
+			if (character->frame > 16)
+			{
+				character->frame = 0;
+			}
+			sprite_set_offset(character->sprite, character->frame);
+			character->counter = 0;
+		}
+	}
+	sprite_position(character->sprite, character->x, character->y);
+}
+
+/* This clears all sprite from visible map and moves them offscreen. */
+void sprite_clear()
+{
+	next_sprite_index = 0;
+	for (int i = 0; i < NUM_SPRITES; i++)
+	{
+		sprites[i].attribute0 = HEIGHT;
+		sprites[i].attribute1 = WIDTH;
+	}
+}
+
 /* Wait function. */
 void delay(unsigned int amount)
 {
@@ -279,10 +389,15 @@ void delay(unsigned int amount)
 /* Main function. */
 int main()
 {
-	*display_control = MODE0 | BG0_ENABLE | BG1_ENABLE;
+	*display_control = MODE0 | BG0_ENABLE | BG1_ENABLE | SPRITE_ENABLE | SPRITE_MAP_1D;
 	setup_background(map1_data, map1_palette, map1_width, map1_height, map1tile, map1tile_width, map1tile_height);
 	setup_boundary(map1boundary, map1boundary_width, map1boundary_height);
-	
+	setup_sprite_image();
+	sprite_clear();
+
+	struct Character cainWorld;
+	character_init(&cainWorld, 120, 80, SIZE_16_16);
+
 	int xscroll = 0;
 	int yscroll = 0;
 	
