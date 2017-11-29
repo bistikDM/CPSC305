@@ -7,7 +7,9 @@ GBA game that mimics old JRPG, based off of Final Fantasy series.
 #include "map1tile.h"
 #include "map1boundary.h"
 /* Second map and tile of the game. */
-//#include "second.h"
+#include "map2.h"
+#include "map2tile.h"
+#include "map2boundary.h"
 
 /* Sprites for the game. */
 #include "sprites.h"
@@ -155,25 +157,6 @@ void memcpy16(unsigned short* dest, const unsigned short* source, int amount)
 /* This map is drawn on bg1 for visible game map. */
 void setup_background(const unsigned char* map_data, const unsigned short* map_palette, unsigned short map_width, unsigned short map_height, const unsigned short* tile, unsigned short tile_width, unsigned short tile_height)
 {
-	/*
-	int i;
-	for (i = 0; i < PALETTE_SIZE; i++)
-	{
-		bg_palette[i] = map_palette[i];
-	}
-	volatile unsigned short* dest = char_block(0);
-	unsigned short* image = (unsigned short*) map_data;
-	for (i = 0; i < ((map_width * map_height) / 2); i++)
-	{
-		dest[i] = image[i];
-	}
-	*bg0_control = 0 | (0 << 2) | (0 << 6) | (1 << 7) | (16 << 8) | (1 << 13) | (0 << 14);
-	dest = screen_block(16);
-	for (i = 0; i < (tile_width * tile_height); i++)
-	{
-		dest[i] = tile[i];
-	}
-	*/
 	memcpy16((unsigned short*) bg_palette, (unsigned short*) map_palette, PALETTE_SIZE);
 	volatile unsigned short* dest = char_block(0);
 	memcpy16((unsigned short*) dest, (const unsigned short*) map_data, (map_width * map_height) / 2);
@@ -185,17 +168,46 @@ void setup_background(const unsigned char* map_data, const unsigned short* map_p
 /* This map is drawn on bg0 for playable boundaries. */
 void setup_boundary(const unsigned short* tile, unsigned short tile_width, unsigned short tile_height)
 {
-	/*
-	int i;
-	volatile unsigned short* dest = screen_block(17);
-	for (i = 0; i < (tile_width * tile_height); i++)
-	{
-		dest[i] = tile[i];
-	}
-	*/
 	volatile unsigned short* dest = screen_block(17);
 	memcpy16((unsigned short*) dest, (const unsigned short*) tile, (tile_width * tile_height));
 	*bg0_control = 0 | (0 << 2) | (0 << 6) | (1 << 7) | (16 << 8) | (1 << 13) | (0 << 14);
+}
+
+/*
+Looks up what kind of tile it is and return a number that will determine what action to perform:
+	0 - Normal movement.
+	1 - boundary tile, stop character movement.
+	2 - Interaction tile, perform specific action.
+	3 - New map tile, load new map into screen.
+ */
+unsigned short tile_interact(int x_coord, int y_coord, int xscroll, int yscroll, const unsigned short* boundary, int boundary_width, int boundary_height, unsigned short new_map_tile, unsigned short interaction_tile)
+{
+	x_coord += xscroll;
+	y_coord += yscroll;
+	x_coord >>= 3;
+	y_coord >>= 3;
+	
+	while (x_coord >= boundary_width) x_coord -= boundary_width;
+	while (y_coord >= boundary_height) y_coord -= boundary_height;
+	while (x_coord < 0) x_coord += boundary_width;
+	while (y_coord < 0) y_coord += boundary_height;
+	int index = y_coord * boundary_width + x_coord;
+	
+	switch (boundary[index])
+	{
+		case new_map_tile:
+			return 3;
+			break;
+		case interaction_tile:
+			return 2;
+			break;
+		case 149:
+			return 1;
+			break;
+		default:
+			return 0;
+			break;
+	}
 }
 
 /* Setup the sprite image and palette. */
@@ -259,6 +271,17 @@ void sprite_set_offset(struct Sprite* sprite, int offset)
 void sprite_update_all()
 {
 	memcpy16((unsigned short*) sprite_attribute_memory, (unsigned short*) sprites, NUM_SPRITES * 4);
+}
+
+/* This clears all sprite from visible map and moves them offscreen. */
+void sprite_clear()
+{
+	next_sprite_index = 0;
+	for (int i = 0; i < NUM_SPRITES; i++)
+	{
+		sprites[i].attribute0 = HEIGHT;
+		sprites[i].attribute1 = WIDTH;
+	}
 }
 
 /* A struct for each character's logic and behavior. */
@@ -407,13 +430,6 @@ void character_update(struct Character* character)
 		character->counter++;
 		if (character->counter >= character->animation_delay)
 		{
-			/*
-			character->frame += 8;
-			if (character->frame > 8)
-			{
-				character->frame = 0;
-			}
-			*/
 			switch (character->direction)
 			{
 				case 0:		
@@ -452,17 +468,6 @@ void character_update(struct Character* character)
 	sprite_position(character->sprite, character->x, character->y);
 }
 
-/* This clears all sprite from visible map and moves them offscreen. */
-void sprite_clear()
-{
-	next_sprite_index = 0;
-	for (int i = 0; i < NUM_SPRITES; i++)
-	{
-		sprites[i].attribute0 = HEIGHT;
-		sprites[i].attribute1 = WIDTH;
-	}
-}
-
 /* Wait function. */
 void delay(unsigned int amount)
 {
@@ -483,43 +488,203 @@ int main()
 
 	int xscroll = 0;
 	int yscroll = 0;
+	unsigned short tileCheck;
+	unsigned short mapTracker = 1;
 	
 	while (1)
 	{
-		character_update(&cainWorld);
-		if (button_pressed(BUTTON_DOWN))
+		if (mapTracker == 1 || mapTracker == 2)
 		{
-			if (character_down(&cainWorld))
+			character_update(&cainWorld);
+			if (button_pressed(BUTTON_DOWN))
 			{
-				yscroll++;
+				if (character_down(&cainWorld))
+				{
+					// yscroll++;
+					if (mapTracker == 1)
+					{
+						tileCheck = tile_interact((cainWorld->x >> 8) + 8, (cainWorld->y >> 8) + 32, xscroll, yscroll, map1boundary, map1boundary_width, map1boundary_height, 34, 999);
+					}
+					else if (mapTracker == 2)
+					{
+						// Fix new map tile and map interact tile to link to map1 and for fight map.
+						tileCheck = tile_interact((cainWorld->x >> 8) + 8, (cainWorld->y >> 8) + 32, xscroll, yscroll, map2boundary, map2boundary_width, map2boundary_height, 34, 999);
+					}
+					switch (tileCheck)
+					{
+						case 0:
+							yscroll++;
+							break;
+						case 1:
+							character_stop(&cainWorld);
+							break;
+						case 2:
+							// TO DO.
+							break;
+						case 3:
+							if (mapTracker == 1)
+							{
+								setup_background(map2_data, map2_palette, map2_width, map2_height, map2tile, map2tile_width, map2tile_height);
+								setup_boundary(map2boundary, map2boundary_width, map2boundary_height);
+								mapTracker = 2;
+							}
+							else if (mapTracker == 2)
+							{
+								setup_background(map1_data, map1_palette, map1_width, map1_height, map1tile, map1tile_width, map1tile_height);
+								setup_boundary(map1boundary, map1boundary_width, map1boundary_height);
+								mapTracker = 1;
+							}
+							sprite_clear();
+							cainWorld->x = 120;
+							cainWorld->y = 80;
+							break;
+					}
+				}
+			}
+			else if (button_pressed(BUTTON_UP))
+			{
+				if (character_up(&cainWorld))
+				{
+					// yscroll--;
+					if (mapTracker == 1)
+					{
+						tileCheck = tile_interact((cainWorld->x >> 8) + 8, (cainWorld->y >> 8) + 32, xscroll, yscroll, map1boundary, map1boundary_width, map1boundary_height, 34, 999);
+					}
+					else if (mapTracker == 2)
+					{
+						// Fix new map tile and map interact tile to link to map1 and for fight map.
+						tileCheck = tile_interact((cainWorld->x >> 8) + 8, (cainWorld->y >> 8) + 32, xscroll, yscroll, map2boundary, map2boundary_width, map2boundary_height, 34, 999);
+					}
+					switch (tileCheck)
+					{
+						case 0:
+							yscroll--;
+							break;
+						case 1:
+							character_stop(&cainWorld);
+							break;
+						case 2:
+							// TO DO.
+							break;
+						case 3:
+							if (mapTracker == 1)
+							{
+								setup_background(map2_data, map2_palette, map2_width, map2_height, map2tile, map2tile_width, map2tile_height);
+								setup_boundary(map2boundary, map2boundary_width, map2boundary_height);
+								mapTracker = 2;
+							}
+							else if (mapTracker == 2)
+							{
+								setup_background(map1_data, map1_palette, map1_width, map1_height, map1tile, map1tile_width, map1tile_height);
+								setup_boundary(map1boundary, map1boundary_width, map1boundary_height);
+								mapTracker = 1;
+							}
+							sprite_clear();
+							cainWorld->x = 120;
+							cainWorld->y = 80;
+							break;
+					}
+				}
+			}
+			else if (button_pressed(BUTTON_RIGHT))
+			{
+				if (character_right(&cainWorld))
+				{
+					// xscroll++;
+					if (mapTracker == 1)
+					{
+						tileCheck = tile_interact((cainWorld->x >> 8) + 8, (cainWorld->y >> 8) + 32, xscroll, yscroll, map1boundary, map1boundary_width, map1boundary_height, 34, 999);
+					}
+					else if (mapTracker == 2)
+					{
+						// Fix new map tile and map interact tile to link to map1 and for fight map.
+						tileCheck = tile_interact((cainWorld->x >> 8) + 8, (cainWorld->y >> 8) + 32, xscroll, yscroll, map2boundary, map2boundary_width, map2boundary_height, 34, 999);
+					}
+					switch (tileCheck)
+					{
+						case 0:
+							xscroll++;
+							break;
+						case 1:
+							character_stop(&cainWorld);
+							break;
+						case 2:
+							// TO DO.
+							break;
+						case 3:
+							if (mapTracker == 1)
+							{
+								setup_background(map2_data, map2_palette, map2_width, map2_height, map2tile, map2tile_width, map2tile_height);
+								setup_boundary(map2boundary, map2boundary_width, map2boundary_height);
+								mapTracker = 2;
+							}
+							else if (mapTracker == 2)
+							{
+								setup_background(map1_data, map1_palette, map1_width, map1_height, map1tile, map1tile_width, map1tile_height);
+								setup_boundary(map1boundary, map1boundary_width, map1boundary_height);
+								mapTracker = 1;
+							}
+							sprite_clear();
+							cainWorld->x = 120;
+							cainWorld->y = 80;
+							break;
+					}
+				}
+			}
+			else if (button_pressed(BUTTON_LEFT))
+			{
+				if (character_left(&cainWorld))
+				{
+					// xscroll--;
+					if (mapTracker == 1)
+					{
+						tileCheck = tile_interact((cainWorld->x >> 8) + 8, (cainWorld->y >> 8) + 32, xscroll, yscroll, map1boundary, map1boundary_width, map1boundary_height, 34, 999);
+					}
+					else if (mapTracker == 2)
+					{
+						// Fix new map tile and map interact tile to link to map1 and for fight map.
+						tileCheck = tile_interact((cainWorld->x >> 8) + 8, (cainWorld->y >> 8) + 32, xscroll, yscroll, map2boundary, map2boundary_width, map2boundary_height, 34, 999);
+					}
+					switch (tileCheck)
+					{
+						case 0:
+							xscroll--;
+							break;
+						case 1:
+							character_stop(&cainWorld);
+							break;
+						case 2:
+							// TO DO.
+							break;
+						case 3:
+							if (mapTracker == 1)
+							{
+								setup_background(map2_data, map2_palette, map2_width, map2_height, map2tile, map2tile_width, map2tile_height);
+								setup_boundary(map2boundary, map2boundary_width, map2boundary_height);
+								mapTracker = 2;
+							}
+							else if (mapTracker == 2)
+							{
+								setup_background(map1_data, map1_palette, map1_width, map1_height, map1tile, map1tile_width, map1tile_height);
+								setup_boundary(map1boundary, map1boundary_width, map1boundary_height);
+								mapTracker = 1;
+							}
+							sprite_clear();
+							cainWorld->x = 120;
+							cainWorld->y = 80;
+							break;
+					}
+				}
+			}
+			else
+			{
+				character_stop(&cainWorld);
 			}
 		}
-		else if (button_pressed(BUTTON_UP))
+		else if (mapTracker == 3)
 		{
-			if (character_up(&cainWorld))
-			{
-				yscroll--;
-			}
+			// TO DO fight map logic.
 		}
-		else if (button_pressed(BUTTON_RIGHT))
-		{
-			if (character_right(&cainWorld))
-			{
-				xscroll++;
-			}
-		}
-		else if (button_pressed(BUTTON_LEFT))
-		{
-			if (character_left(&cainWorld))
-			{
-				xscroll--;
-			}
-		}
-		else
-		{
-			character_stop(&cainWorld);
-		}
-		
 		wait_vblank();
 		*bg0_x_scroll = xscroll;
 		*bg0_y_scroll = yscroll;
@@ -555,12 +720,18 @@ const intrp IntrTable[13] = {
 
 /*
 TO DO:
-~ Put all .h into structs so it can be passed as as an argument into functions to make things simpler.
-~ Work on map2 zone.
+~ Put all .h into structs so it can be passed as an argument into functions to make things simpler.
+~ Modularize code into multiple files to make it cleaner.
+~ Work on map1. (done)
+~ Work on map1 boundary. (done)
+~ Work on map2.
+~ Work on map2 boundary.
 ~ Work on sprites. (done)
-~ Sprite collision.
+~ Sprite movement. (done)
+~ Sprite direction. (done)
+~ Sprite collision. (done)
 ~ Battle map.
 ~ Fight menu.
-~ Sprite movement. (done)
-~ Sprite direction.
+~ Convert 3 functions into assembly.
+~ Smooth screen (map) transition.
 */
