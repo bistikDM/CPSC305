@@ -276,15 +276,33 @@ void character_init(struct Character* character, int x_coord, int y_coord, enum 
 	character->border = 40;
 	character->frame = 0;
 	character->move = 0;
-	character->direction = 0;
-	character->counter = 0;
-	character->animation_delay = 12;
+	switch (character->direction)
+	{
+		case 0:
+			character->frame = 0;
+			break;
+		case 1:
+			character->frame = 32;
+			break;
+		case 2:
+			character->frame = 16;
+			break;
+		case 3:
+			character->frame = 48;
+			break;
+	}
+	character->counter = 4;
+	character->animation_delay = 5;
 	character->sprite = sprite_init(x_coord, y_coord, size, 0, 0);
 }
 
 /* Moves the character left and if at the border limit, move map instead. */
 int character_left(struct Character* character)
 {
+	if (character->move == 0)
+	{
+		character->frame = 32;
+	}
 	character->move = 1;
 	character->direction = 1;
 	if (character->x < character->border)
@@ -301,8 +319,12 @@ int character_left(struct Character* character)
 /* Moves the character right and if at the border limit, move map instead. */
 int character_right(struct Character* character)
 {
+	if (character->move == 0)
+	{
+		character->frame = 48;
+	}
 	character->move = 1;
-	character->direction = 2;
+	character->direction = 3;
 	if (character->x > (WIDTH - character->border))
 	{
 		return 1;
@@ -317,8 +339,12 @@ int character_right(struct Character* character)
 /* Moves the character up and if at the border limit, move map instead. */
 int character_up(struct Character* character)
 {
+	if (character->move == 0)
+	{
+		character->frame = 16;
+	}
 	character->move = 1;
-	character->direction = 3;
+	character->direction = 2;
 	if (character->y < character->border)
 	{
 		return 1;
@@ -333,6 +359,10 @@ int character_up(struct Character* character)
 /* Moves the character down and if a t the border limit, move map instead. */
 int character_down(struct Character* character)
 {
+	if (character->move == 0)
+	{
+		character->frame = 0;
+	}
 	character->move = 1;
 	character->direction = 0;
 	if (character->y > (HEIGHT - character->border))
@@ -350,7 +380,22 @@ int character_down(struct Character* character)
 void character_stop(struct Character* character)
 {
 	character->move = 0;
-	character->frame = 0;
+	character->counter = 4;
+	switch (character->direction)
+	{
+		case 0:
+			character->frame = 0;
+			break;
+		case 1:
+			character->frame = 32;
+			break;
+		case 2:
+			character->frame = 16;
+			break;
+		case 3:
+			character->frame = 48;
+			break;
+	}
 	sprite_set_offset(character->sprite, character->frame);
 }
 
@@ -379,24 +424,24 @@ void character_update(struct Character* character)
 					}
 					break;
 				case 1:
-					character->frame += 16;
-					if (character->frame > 16)
+					character->frame += 8;
+					if (character->frame > 40)
 					{
-						character->frame = 0;
+						character->frame = 32;
 					}
 					break;
 				case 2:
-					character->frame += 24;
+					character->frame += 8;
 					if (character->frame > 24)
 					{
-						character->frame = 0;
+						character->frame = 16;
 					}
 					break;
 				case 3:
-					character->frame += 32;
-					if (character->frame > 32)
+					character->frame += 8;
+					if (character->frame > 56)
 					{
-						character->frame = 0;
+						character->frame = 48;
 					}
 					break;
 			}
