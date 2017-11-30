@@ -457,6 +457,50 @@ void character_update(struct Character* character)
 	sprite_position(character->sprite, character->x, character->y);
 }
 
+/* Checks what tile the character is standing on:
+	1 - Loads map2.
+	2 - Loads map1 or boss fight.
+*/
+unsigned short location_check(struct Character* character, int xscroll, int yscroll, unsigned short tracker)
+{
+	unsigned short action;
+	if (tracker == 1)
+	{
+		unsigned short tileCheck = tile_interact((character->x >> 8) + 8, (character->y >> 8) + 32, xscroll, yscroll, map1boundary, map1boundary_width, map1boundary_height, 34, 999, 149);
+		if (tileCheck == 0) action = 1;
+		else if (tileCheck == 1) action = 0;
+		else if (tileCheck == 3)
+		{	
+			setup_background(map2_data, map2_palette, map2_width, map2_height, map2tile, map2tile_width, map2tile_height);
+			setup_boundary(map2boundary, map2boundary_width, map2boundary_height);
+			action = 2;
+			sprite_clear();
+			character->x = 120;
+			character->y = 80;
+		}
+	}
+	else if (tracker == 2)
+	{
+		unsigned short tileCheck = tile_interact((character->x >> 8) + 8, (character->y >> 8) + 32, xscroll, yscroll, map2boundary, map2boundary_width, map2boundary_height, 34, 999, 329);
+		if (tileCheck == 0) action = 1;
+		else if (tileCheck == 1) action = 0;
+		if (tileCheck == 2)
+		{
+			// TO DO.
+		}
+		else if (tileCheck == 3)
+		{	
+			setup_background(map1_data, map1_palette, map1_width, map1_height, map1tile, map1tile_width, map1tile_height);
+			setup_boundary(map1boundary, map1boundary_width, map1boundary_height);
+			action = 2;
+			sprite_clear();
+			character->x = 120;
+			character->y = 80;
+		}
+	}
+	return action;
+}
+
 /* Wait function. */
 void delay(unsigned int amount)
 {
@@ -477,206 +521,52 @@ int main()
 
 	int xscroll = 0;
 	int yscroll = 0;
-	unsigned short tileCheck;
+	unsigned short action = 1;
 	unsigned short mapTracker = 1;
-	
+
 	while (1)
 	{
-		if (mapTracker == 1 || mapTracker == 2)
+		character_update(&cainWorld);
+		action = location_check(&cainWorld, xscroll, yscroll, mapTracker);
+		if (button_pressed(BUTTON_DOWN))
 		{
-			character_update(&cainWorld);
-			if (button_pressed(BUTTON_DOWN))
+			if (character_down(&cainWorld) && action == 1)
 			{
-				if (character_down(&cainWorld))
-				{
-					// yscroll++;
-					if (mapTracker == 1)
-					{
-						tileCheck = tile_interact((cainWorld->x >> 8) + 8, (cainWorld->y >> 8) + 32, xscroll, yscroll, map1boundary, map1boundary_width, map1boundary_height, 34, 999, 149);
-					}
-					else if (mapTracker == 2)
-					{
-						// Fix new map tile and map interact tile to link to map1 and for fight map.
-						tileCheck = tile_interact((cainWorld->x >> 8) + 8, (cainWorld->y >> 8) + 32, xscroll, yscroll, map2boundary, map2boundary_width, map2boundary_height, 34, 999, 329);
-					}
-					switch (tileCheck)
-					{
-						case 0:
-							yscroll++;
-							break;
-						case 1:
-							character_stop(&cainWorld);
-							break;
-						case 2:
-							// TO DO.
-							break;
-						case 3:
-							if (mapTracker == 1)
-							{
-								setup_background(map2_data, map2_palette, map2_width, map2_height, map2tile, map2tile_width, map2tile_height);
-								setup_boundary(map2boundary, map2boundary_width, map2boundary_height);
-								mapTracker = 2;
-							}
-							else if (mapTracker == 2)
-							{
-								setup_background(map1_data, map1_palette, map1_width, map1_height, map1tile, map1tile_width, map1tile_height);
-								setup_boundary(map1boundary, map1boundary_width, map1boundary_height);
-								mapTracker = 1;
-							}
-							sprite_clear();
-							cainWorld->x = 120;
-							cainWorld->y = 80;
-							break;
-					}
-				}
-			}
-			else if (button_pressed(BUTTON_UP))
-			{
-				if (character_up(&cainWorld))
-				{
-					// yscroll--;
-					if (mapTracker == 1)
-					{
-						tileCheck = tile_interact((cainWorld->x >> 8) + 8, (cainWorld->y >> 8) + 32, xscroll, yscroll, map1boundary, map1boundary_width, map1boundary_height, 34, 999, 149);
-					}
-					else if (mapTracker == 2)
-					{
-						// Fix new map tile and map interact tile to link to map1 and for fight map.
-						tileCheck = tile_interact((cainWorld->x >> 8) + 8, (cainWorld->y >> 8) + 32, xscroll, yscroll, map2boundary, map2boundary_width, map2boundary_height, 34, 999, 329);
-					}
-					switch (tileCheck)
-					{
-						case 0:
-							yscroll--;
-							break;
-						case 1:
-							character_stop(&cainWorld);
-							break;
-						case 2:
-							// TO DO.
-							break;
-						case 3:
-							if (mapTracker == 1)
-							{
-								setup_background(map2_data, map2_palette, map2_width, map2_height, map2tile, map2tile_width, map2tile_height);
-								setup_boundary(map2boundary, map2boundary_width, map2boundary_height);
-								mapTracker = 2;
-							}
-							else if (mapTracker == 2)
-							{
-								setup_background(map1_data, map1_palette, map1_width, map1_height, map1tile, map1tile_width, map1tile_height);
-								setup_boundary(map1boundary, map1boundary_width, map1boundary_height);
-								mapTracker = 1;
-							}
-							sprite_clear();
-							cainWorld->x = 120;
-							cainWorld->y = 80;
-							break;
-					}
-				}
-			}
-			else if (button_pressed(BUTTON_RIGHT))
-			{
-				if (character_right(&cainWorld))
-				{
-					// xscroll++;
-					if (mapTracker == 1)
-					{
-						tileCheck = tile_interact((cainWorld->x >> 8) + 8, (cainWorld->y >> 8) + 32, xscroll, yscroll, map1boundary, map1boundary_width, map1boundary_height, 34, 999, 149);
-					}
-					else if (mapTracker == 2)
-					{
-						// Fix new map tile and map interact tile to link to map1 and for fight map.
-						tileCheck = tile_interact((cainWorld->x >> 8) + 8, (cainWorld->y >> 8) + 32, xscroll, yscroll, map2boundary, map2boundary_width, map2boundary_height, 34, 999, 329);
-					}
-					switch (tileCheck)
-					{
-						case 0:
-							xscroll++;
-							break;
-						case 1:
-							character_stop(&cainWorld);
-							break;
-						case 2:
-							// TO DO.
-							break;
-						case 3:
-							if (mapTracker == 1)
-							{
-								setup_background(map2_data, map2_palette, map2_width, map2_height, map2tile, map2tile_width, map2tile_height);
-								setup_boundary(map2boundary, map2boundary_width, map2boundary_height);
-								mapTracker = 2;
-							}
-							else if (mapTracker == 2)
-							{
-								setup_background(map1_data, map1_palette, map1_width, map1_height, map1tile, map1tile_width, map1tile_height);
-								setup_boundary(map1boundary, map1boundary_width, map1boundary_height);
-								mapTracker = 1;
-							}
-							sprite_clear();
-							cainWorld->x = 120;
-							cainWorld->y = 80;
-							break;
-					}
-				}
-			}
-			else if (button_pressed(BUTTON_LEFT))
-			{
-				if (character_left(&cainWorld))
-				{
-					// xscroll--;
-					if (mapTracker == 1)
-					{
-						tileCheck = tile_interact((cainWorld->x >> 8) + 8, (cainWorld->y >> 8) + 32, xscroll, yscroll, map1boundary, map1boundary_width, map1boundary_height, 34, 999, 149);
-					}
-					else if (mapTracker == 2)
-					{
-						// Fix new map tile and map interact tile to link to map1 and for fight map.
-						tileCheck = tile_interact((cainWorld->x >> 8) + 8, (cainWorld->y >> 8) + 32, xscroll, yscroll, map2boundary, map2boundary_width, map2boundary_height, 34, 999, 329);
-					}
-					switch (tileCheck)
-					{
-						case 0:
-							xscroll--;
-							break;
-						case 1:
-							character_stop(&cainWorld);
-							break;
-						case 2:
-							// TO DO.
-							break;
-						case 3:
-							if (mapTracker == 1)
-							{
-								setup_background(map2_data, map2_palette, map2_width, map2_height, map2tile, map2tile_width, map2tile_height);
-								setup_boundary(map2boundary, map2boundary_width, map2boundary_height);
-								mapTracker = 2;
-							}
-							else if (mapTracker == 2)
-							{
-								setup_background(map1_data, map1_palette, map1_width, map1_height, map1tile, map1tile_width, map1tile_height);
-								setup_boundary(map1boundary, map1boundary_width, map1boundary_height);
-								mapTracker = 1;
-							}
-							sprite_clear();
-							cainWorld->x = 120;
-							cainWorld->y = 80;
-							break;
-					}
-				}
-			}
-			else
-			{
-				character_stop(&cainWorld);
+				yscroll++;
 			}
 		}
-		else if (mapTracker == 3)
+		else if (button_pressed(BUTTON_UP))
 		{
-			// TO DO fight map logic.
+			if (character_up(&cainWorld) && action == 1)
+			{
+				yscroll--;
+			}
 		}
+		else if (button_pressed(BUTTON_RIGHT))
+		{
+			if (character_right(&cainWorld) && action == 1)
+			{
+				xscroll++;
+			}
+		}
+		else if (button_pressed(BUTTON_LEFT))
+		{
+			if (character_left(&cainWorld) && action == 1)
+			{
+				xscroll--;
+			}
+		}
+		else
+		{
+			character_stop(&cainWorld);
+		}
+		if (action == 3 && mapTracker == 1) mapTracker = 2;
+		else if (action == 3 && mapTracker == 2) mapTracker = 1;
 		wait_vblank();
 		*bg0_x_scroll = xscroll;
 		*bg0_y_scroll = yscroll;
+		*bg1_x_scroll = xscroll;
+		*bg1_y_scroll = yscroll;
 		sprite_update_all();
 		delay(500);
 	}
