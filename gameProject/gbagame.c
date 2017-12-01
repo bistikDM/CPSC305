@@ -127,6 +127,13 @@ void wait_vblank()
 	}
 }
 
+/* A struct for each character's logic and behavior. */
+struct Character
+{
+	struct Sprite* sprite;
+	int x, y, frame, animation_delay, counter, move, direction, border;
+};
+
 /* This checks if a button has been pressed and return a true(1) or false(0). */
 unsigned char button_pressed(unsigned short button)
 {
@@ -162,7 +169,7 @@ void setup_background(const unsigned char* map_data, const unsigned short* map_p
 	memcpy16((unsigned short*) dest, (const unsigned short*) map_data, (map_width * map_height) / 2);
 	dest = screen_block(16);
 	memcpy16((unsigned short*) dest, (const unsigned short*) tile, (tile_width * tile_height));
-	*bg1_control = 1 | (0 << 2) | (0 << 6) | (1 << 7) | (17 << 8) | (1 << 13) | (0 << 14);
+	*bg1_control = 1 | (0 << 2) | (0 << 6) | (1 << 7) | (16 << 8) | (1 << 13) | (0 << 14);
 }
 
 /* This map is drawn on bg0 for playable boundaries. */
@@ -170,7 +177,7 @@ void setup_boundary(const unsigned short* tile, unsigned short tile_width, unsig
 {
 	volatile unsigned short* dest = screen_block(17);
 	memcpy16((unsigned short*) dest, (const unsigned short*) tile, (tile_width * tile_height));
-	*bg0_control = 0 | (0 << 2) | (0 << 6) | (1 << 7) | (16 << 8) | (1 << 13) | (0 << 14);
+	*bg0_control = 0 | (0 << 2) | (0 << 6) | (1 << 7) | (17 << 8) | (1 << 13) | (0 << 14);
 }
 
 /*
@@ -197,6 +204,28 @@ unsigned short tile_interact(int x_coord, int y_coord, int xscroll, int yscroll,
 	else if (boundary[index] == interaction_tile) return 2;
 	else if (boundary[index] == boundary_tile) return 1;
 	else return 0;
+}
+
+unsigned short move_collision(struct Character* character, int xscroll, int yscroll, const unsigned short* boundary, int boundary_width, int boundary_height, unsigned short boundary_tile)
+{
+	int x_coord = character->x + xscroll + 16;
+	int y_coord = character->y + yscroll + 16;
+	x_coord >>= 3;
+	y_coord >>= 3;
+	
+	while (x_coord >= boundary_width) x_coord -= boundary_width;
+	while (y_coord >= boundary_height) y_coord -= boundary_height;
+	while (x_coord < 0) x_coord += boundary_width;
+	while (y_coord < 0) y_coord += boundary_height;
+	int up = (y_coord - 1) * boundary_width + x_coord;
+	int down = (y_coord + 1) * boundary_width + x_coord;
+	int left = y_coord * boundary_width + (x_coord - 1);
+	int right = y_coord * boundary_width + (x_coord + 1);
+
+	if (boundary[down] == boundary_tile) return 0;
+	else if (boundary[left] == boundary_tile) return 1;
+	else if (boundary[up] == boundary_tile) return 2;
+	else if (boundary[right] == boundary_tile) return 3;
 }
 
 /* Setup the sprite image and palette. */
@@ -272,13 +301,6 @@ void sprite_clear()
 		sprites[i].attribute1 = WIDTH;
 	}
 }
-
-/* A struct for each character's logic and behavior. */
-struct Character
-{
-	struct Sprite* sprite;
-	int x, y, frame, animation_delay, counter, move, direction, border;
-};
 
 /* Initializes a character. */
 void character_init(struct Character* character, int x_coord, int y_coord, enum SpriteSize size)
@@ -466,7 +488,7 @@ unsigned short location_check(struct Character* character, int xscroll, int yscr
 	unsigned short action;
 	if (tracker == 1)
 	{
-		unsigned short tileCheck = tile_interact((character->x >> 8) + 8, (character->y >> 8) + 32, xscroll, yscroll, map1boundary, map1boundary_width, map1boundary_height, 34, 999, 149);
+		unsigned short tileCheck = tile_interact((character->x + 16), (character->y + 16), xscroll, yscroll, map1boundary, map1boundary_width, map1boundary_height, 49, 999, 149);
 		if (tileCheck == 0) action = 1;
 		else if (tileCheck == 1) action = 0;
 		else if (tileCheck == 3)
@@ -475,13 +497,12 @@ unsigned short location_check(struct Character* character, int xscroll, int yscr
 			setup_boundary(map2boundary, map2boundary_width, map2boundary_height);
 			action = 2;
 			sprite_clear();
-			character->x = 120;
-			character->y = 80;
+			character_init(character, 90,110, SIZE_16_16);
 		}
 	}
 	else if (tracker == 2)
 	{
-		unsigned short tileCheck = tile_interact((character->x >> 8) + 8, (character->y >> 8) + 32, xscroll, yscroll, map2boundary, map2boundary_width, map2boundary_height, 34, 999, 329);
+		unsigned short tileCheck = tile_interact((character->x + 16), (character->y + 16), xscroll, yscroll, map2boundary, map2boundary_width, map2boundary_height, 159, 999, 329);
 		if (tileCheck == 0) action = 1;
 		else if (tileCheck == 1) action = 0;
 		if (tileCheck == 2)
@@ -494,8 +515,7 @@ unsigned short location_check(struct Character* character, int xscroll, int yscr
 			setup_boundary(map1boundary, map1boundary_width, map1boundary_height);
 			action = 2;
 			sprite_clear();
-			character->x = 120;
-			character->y = 80;
+			character_init(character, 90,110, SIZE_16_16);
 		}
 	}
 	return action;
@@ -517,41 +537,55 @@ int main()
 	sprite_clear();
 
 	struct Character cainWorld;
-	character_init(&cainWorld, 120, 80, SIZE_16_16);
+	character_init(&cainWorld, 90,110, SIZE_16_16);
 
 	int xscroll = 0;
 	int yscroll = 0;
 	unsigned short action = 1;
 	unsigned short mapTracker = 1;
+	unsigned short move;
 
 	while (1)
 	{
 		character_update(&cainWorld);
-		action = location_check(&cainWorld, xscroll, yscroll, mapTracker);
-		if (button_pressed(BUTTON_DOWN))
+		if (action == 0)
 		{
-			if (character_down(&cainWorld) && action == 1)
+			if (mapTracker == 1)
+			{
+				move = move_collision(&cainWorld, xscroll, yscroll, map1boundary, map1boundary_width, map1boundary_height, 149);
+			}
+			else if (mapTracker == 2)
+			{
+				move = move_collision(&cainWorld, xscroll, yscroll, map2boundary, map2boundary_width, map2boundary_height, 329);
+			}
+		}
+		action = location_check(&cainWorld, xscroll, yscroll, mapTracker);
+		if (action == 3 && mapTracker == 1) mapTracker = 2;
+		else if (action == 3 && mapTracker == 2) mapTracker = 1;
+		if ((button_pressed(BUTTON_DOWN) && action == 1) || (button_pressed(BUTTON_DOWN) && (move != 0)))
+		{
+			if (character_down(&cainWorld))
 			{
 				yscroll++;
 			}
 		}
-		else if (button_pressed(BUTTON_UP))
+		else if ((button_pressed(BUTTON_UP) && action == 1) || (button_pressed(BUTTON_UP) && (move != 2)))
 		{
-			if (character_up(&cainWorld) && action == 1)
+			if (character_up(&cainWorld))
 			{
 				yscroll--;
 			}
 		}
-		else if (button_pressed(BUTTON_RIGHT))
+		else if ((button_pressed(BUTTON_RIGHT) && action == 1) || (button_pressed(BUTTON_RIGHT) && (move != 3)))
 		{
-			if (character_right(&cainWorld) && action == 1)
+			if (character_right(&cainWorld))
 			{
 				xscroll++;
 			}
 		}
-		else if (button_pressed(BUTTON_LEFT))
+		else if ((button_pressed(BUTTON_LEFT) && action == 1) || (button_pressed(BUTTON_LEFT) && (move != 1)))
 		{
-			if (character_left(&cainWorld) && action == 1)
+			if (character_left(&cainWorld))
 			{
 				xscroll--;
 			}
@@ -560,8 +594,6 @@ int main()
 		{
 			character_stop(&cainWorld);
 		}
-		if (action == 3 && mapTracker == 1) mapTracker = 2;
-		else if (action == 3 && mapTracker == 2) mapTracker = 1;
 		wait_vblank();
 		*bg0_x_scroll = xscroll;
 		*bg0_y_scroll = yscroll;
